@@ -1,0 +1,87 @@
+curl -X POST "http://localhost:9200/_plugins/_ml/mcp/tools/_register" \
+  -H 'Content-Type: application/json' \
+  -d'{
+    "tools": [
+        {
+            "type": "ListIndexTool"
+        },
+        {
+            "type": "IndexMappingTool",
+            "attributes": {
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "index": {
+                            "type": "array",
+                            "description": "Array of index names to get mappings for. Example: [\"my-index\"]"
+                        },
+                        "question": {
+                            "type": "string", 
+                            "description": "Natural language question about the index. Example: \"What fields are in this index?\""
+                        }
+                    },
+                    "required": ["index", "question"]
+                }
+            }
+        },
+        {
+            "type": "SearchIndexTool",
+            "attributes": {
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "input": {
+                            "type": "object",
+                            "properties": {
+                                "index": {
+                                    "type": "string",
+                                    "description": "OpenSearch index name. Example: firewall-logs-+000000"
+                                },
+                                "query": {
+                                    "type": "object",
+                                    "description": "OpenSearch query DSL. Examples: {\"size\": 100} for all docs, {\"query\": {\"match_all\": {}}, \"size\": 50} for match_all query.",
+                                    "additionalProperties": true
+                                }
+                            },
+                            "required": ["index", "query"]
+                        }
+                    },
+                    "required": ["input"]
+                }
+            }
+        }
+    ]
+  }'
+
+  curl -X POST "http://localhost:9200/_plugins/_ml/mcp/tools/_register" \
+  -H 'Content-Type: application/json' \
+  -d'{
+    "tools": [
+        {
+            "type": "SearchIndexTool",
+            "attributes": {
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "input": {
+                            "type": "object",
+                            "properties": {
+                                "index": {
+                                    "type": "string",
+                                    "description": "OpenSearch index name. Example: firewall-logs-+000000"
+                                },
+                                "query": {
+                                    "type": "object",
+                                    "description": "OpenSearch query DSL. Examples: {\"size\": 100} for all docs, {\"size\": 20, \"_source\": \"src_ip\"} for specific field, {\"size\": 10, \"_source\": [\"field1\", \"field2\"]} for multiple fields, {\"size\": 0, \"aggs\": {\"top_terms\": {\"terms\": {\"field\": \"field.keyword\", \"size\": 5}}}} for aggregations. Use _source to filter returned fields.",
+                                    "additionalProperties": true
+                                }
+                            },
+                            "required": ["index", "query"]
+                        }
+                    },
+                    "required": ["input"]
+                }
+            }
+        }
+    ]
+  }'
