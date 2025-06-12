@@ -85,3 +85,39 @@ curl -X POST "http://localhost:9200/_plugins/_ml/mcp/tools/_register" \
         }
     ]
   }'
+
+  curl -X POST "http://localhost:9200/_plugins/_ml/mcp/tools/_register" \
+  -H 'Content-Type: application/json' \
+  -d'{
+    "tools": [
+        {
+            "type": "WebSearchTool",
+            "name": "WebSearchTool",
+            "attributes": {
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "engine": {
+                            "type": "string",
+                            "description": "The search engine to use. Set to duckduckgo.",
+                            "default": "duckduckgo"
+                        },
+                        "query": {
+                            "type": "string",
+                            "description": "The search query to perform. For example: \"OpenSearch index patterns\""
+                        },
+                        "next_page": {
+                            "type": "string",
+                            "description": "The search result\'s next page link. If provided, will fetch the next page of results."
+                        }
+                    },
+                    "required": ["engine", "query"]
+                },
+                "strict": false
+            },
+            "parameters": {
+                "engine": "duckduckgo"
+            }
+        }
+    ]
+}'
