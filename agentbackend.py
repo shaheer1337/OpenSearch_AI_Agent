@@ -1,14 +1,15 @@
 import asyncio
-import json
+import json  # Added JSON import for error parsing
 from dotenv import load_dotenv
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_ollama import ChatOllama
-@@ -8,17 +9,43 @@
+from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
+from langgraph.prebuilt import create_react_agent
+
 # Load environment variables
 load_dotenv()
 
 # Define system prompt
-# Define system prompt with error handling guidance
 system_prompt = """You're an AI assistant with access to OpenSearch tools.
 You can answer questions directly when appropriate, or use tools when needed.
 For data-specific questions, use the appropriate tools.
@@ -36,28 +37,82 @@ Common errors include:
 Remember previous interactions with the user and maintain context throughout the conversation.
 For conversation, just respond normally."""
 
-@@ -36,6 +63,7 @@
+# Create model instance
+model = ChatOllama(
+    model="qwen3:14b",
+    base_url="http://192.168.18.201:11434",
+    temperature=0.1,
+    system=system_prompt
+)
+
+# Initialize variables to be accessible from outside
+tools = []
+agent = None
 client = None
 conversation_history = [SystemMessage(content=system_prompt)]
 is_initialized = False  # Track if we've initialized before
-debug_mode = True  # Enable error display for development
+debug_mode = True  # Added debug mode flag for error display
 
 async def initialize_agent():
     """Initialize the MCP client and agent"""
-@@ -73,7 +101,7 @@ async def initialize_agent():
+    global client, tools, agent, conversation_history, is_initialized
+    
+    # Only reset conversation history on the first initialization
+    if not is_initialized:
+        conversation_history = [SystemMessage(content=system_prompt)]
+        is_initialized = True
+    
+    # Create MCP client
+    client = MultiServerMCPClient({
+        "opensearch": {
+            "url": "http://localhost:9200/_plugins/_ml/mcp/sse?append_to_base_url=true",
+            "transport": "sse",
+            "headers": {
+                "Content-Type": "application/json",
+                "Accept-Encoding": "identity",
+            }
+        }
+    })
+
+    # Get tools
+    tools = await client.get_tools()
+    
+    # Create LangGraph agent with MCP tools
+    agent = create_react_agent(model, tools)
+    
+    return {
+        "tools": tools,
+        "tool_names": [tool.name for tool in tools],
+        "client": client,
+        "agent": agent
+    }
 
 async def process_query(user_input):
     """Process a user query and return results"""
-    global agent, conversation_history
-    global agent, conversation_history, debug_mode
-
+    global agent, conversation_history, debug_mode  # Added debug_mode to globals
+    
     if agent is None:
         await initialize_agent()
-@@ -96,13 +124,86 @@ async def process_query(user_input):
+    
+    # Add user message to history
+    conversation_history.append(HumanMessage(content=user_input))
+    
+    # Process the query with full conversation history
+    result = await agent.ainvoke({"messages": conversation_history})
+
+    # Extract information
+    final_message = result["messages"][-1]
+    
+    # Add AI response to conversation history
+    conversation_history.append(AIMessage(content=final_message.content))
+    
+    # Get tools used
+    tool_messages = [msg for msg in result["messages"] if hasattr(msg, "tool_call_id")]
+    tool_names = []
     if tool_messages:
         tool_names = list(set(msg.tool for msg in tool_messages if hasattr(msg, "tool")))
-
-    # Extract tool errors from the result
+    
+    # Extract tool errors from the result - New error handling code
     tool_errors = []
     for msg in result["messages"]:
         if hasattr(msg, "tool_call_id") and hasattr(msg, "tool"):
@@ -123,8 +178,8 @@ async def process_query(user_input):
     # Ensure conversation history doesn't grow too large (keep last 10 messages)
     if len(conversation_history) > 12:  # system message + 10 exchanges
         conversation_history = [conversation_history[0]] + conversation_history[-11:]
-
-    # For development mode, add error details to the response
+    
+    # For development mode, add error details to the response - New code for debug display
     response = final_message.content
     if debug_mode and tool_errors:
         error_details = "\n\n--- DEVELOPMENT INFO: TOOL ERRORS ---\n"
@@ -134,19 +189,27 @@ async def process_query(user_input):
         response += error_details
     
     return {
-        "response": final_message.content,
-        "response": response,
+        "response": response,  # Updated to use response with potential debug info
         "tools_used": tool_names,
-        "tool_errors": tool_errors if debug_mode else [],
+        "tool_errors": tool_errors if debug_mode else [],  # Added tool_errors to return
         "raw_result": result
     }
 
-@@ -119,6 +220,12 @@ async def main():
+# Default main function just for direct testing
+async def main():
+    await initialize_agent()
+    
+    while True:
+        user_input = input("Query: ").strip()
+        if user_input.lower() in ['exit', 'quit', 'bye']:
+            break
+            
+        result = await process_query(user_input)
         print(f"Response: {result['response']}")
         if result['tools_used']:
             print(f"Tools used: {', '.join(result['tools_used'])}")
         
-        # Display errors in the terminal
+        # Display errors in the terminal - New code to show errors
         if 'tool_errors' in result and result['tool_errors']:
             print("\nTool Errors:")
             for error in result['tool_errors']:
