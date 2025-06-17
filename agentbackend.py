@@ -1,4 +1,4 @@
-import asyncio
+import asyncioAdd commentMore actions
 from dotenv import load_dotenv
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_ollama import ChatOllama
@@ -45,7 +45,7 @@ async def initialize_agent():
     if not is_initialized:
         conversation_history = [SystemMessage(content=system_prompt)]
         is_initialized = True
-    Add commentMore actions
+    
     # Create MCP client
     client = MultiServerMCPClient({
         "opensearch": {
